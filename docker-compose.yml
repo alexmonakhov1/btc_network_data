@@ -1,0 +1,117 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:14
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    volumes:
+      - postgres-db-volume:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "airflow"]
+      interval: 5s
+      retries: 5
+    restart: always
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:latest
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    environment:
+      CLICKHOUSE_DB: default
+      CLICKHOUSE_USER: admin
+      CLICKHOUSE_PASSWORD: clickhouse123
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+    volumes:
+      - clickhouse-data:/var/lib/clickhouse
+    restart: always
+
+  airflow-init:
+    image: apache/airflow:2.8.1
+    depends_on:
+      - postgres
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+      AIRFLOW__CORE__FERNET_KEY: ''
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+      _AIRFLOW_DB_UPGRADE: 'true'
+      _AIRFLOW_WWW_USER_CREATE: 'true'
+      _AIRFLOW_WWW_USER_USERNAME: airflow
+      _AIRFLOW_WWW_USER_PASSWORD: airflow
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./logs:/opt/airflow/logs
+      - ./plugins:/opt/airflow/plugins
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - |
+        airflow db init
+        airflow db upgrade
+        airflow users create -u airflow -p airflow -f Admin -l User -r Admin -e admin@example.com || true
+        echo "Init complete"
+
+  airflow-webserver:
+    image: apache/airflow:2.8.1
+    depends_on:
+      - postgres
+      - airflow-init
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+      AIRFLOW__CORE__FERNET_KEY: ''
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+      _PIP_ADDITIONAL_REQUIREMENTS: clickhouse-connect
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./logs:/opt/airflow/logs
+      - ./plugins:/opt/airflow/plugins
+    ports:
+      - "8080:8080"
+    command: webserver
+    restart: always
+
+  airflow-scheduler:
+    image: apache/airflow:2.8.1
+    depends_on:
+      - postgres
+      - airflow-init
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+      AIRFLOW__CORE__FERNET_KEY: ''
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+      _PIP_ADDITIONAL_REQUIREMENTS: clickhouse-connect
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./logs:/opt/airflow/logs
+      - ./plugins:/opt/airflow/plugins
+    command: scheduler
+    restart: always
+
+  superset:
+    image: my-superset:latest
+    ports:
+      - "8088:8088"
+    environment:
+      SUPERSET_SECRET_KEY: 'thisISaSECRET_1234'
+    volumes:
+      - superset-data:/app/superset_home
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - |
+        superset db upgrade
+        superset fab create-admin --username admin --firstname Admin --lastname User --email admin@admin.com --password admin || true
+        superset init
+        gunicorn --bind 0.0.0.0:8088 --timeout 120 --workers 4 "superset.app:create_app()"
+    restart: always
+
+volumes:
+  postgres-db-volume:
+  clickhouse-data:
+  superset-data:

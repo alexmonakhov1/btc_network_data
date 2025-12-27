@@ -1,0 +1,9 @@
+
+FROM apache/superset:latest
+
+USER root
+
+# Устанавливаем пакеты прямо в директорию site-packages виртуального окружения
+RUN /usr/local/bin/python -m pip install --target /app/.venv/lib/python3.10/site-packages clickhouse-connect clickhouse-sqlalchemy
+
+USER superset

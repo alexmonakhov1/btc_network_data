@@ -18,6 +18,9 @@ CH_CLIENT = clickhouse_connect.get_client(
 URL = 'https://api.blockchain.info/charts/'
 
 # TODO: Bad response: 'fees-usd-per-transaction'. Разобраться с этим
+# TODO: возможно решает через взятие данных отсюда:
+#   https://api.blockchain.info/charts/n-transactions?start=1609459200&timespan=1days&rollingAverage=1days&format=json
+# TODO: fees-usd-per-transaction = transaction-fees-usd / n-transactions
 charts = ['hash-rate', 'miners-revenue', 'transaction-fees-usd', 'transaction-fees',
           'n-transactions-per-block','difficulty']
 task_list = list()

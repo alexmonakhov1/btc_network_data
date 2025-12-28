@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 import clickhouse_connect
@@ -68,11 +68,12 @@ with DAG(
     'btc_price',
     default_args=default_args,
     schedule_interval='@daily',
-    start_date=datetime(2025, 1, 1),
-    end_date=datetime(2025, 1, 10),
+    start_date=datetime(2025, 10, 10), # TODO: убрать это
+    end_date=datetime(2025, 10, 19), # TODO: убрать это
     tags=["btc_price"]
 ) as dag:
 
+    # TODO: может переписать под сенсор?
     extract_load_btc_price_task = PythonOperator(
         task_id='extract_load_btc_price',
         python_callable=extract_load_btc_price,

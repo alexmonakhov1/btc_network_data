@@ -1,12 +1,6 @@
-# Тут навайбкодено
-
-version: '3.8'
-
 services:
   postgres:
     image: postgres:14
-    ports:
-      - "5432:5432"
     environment:
       POSTGRES_USER: airflow
       POSTGRES_PASSWORD: airflow
@@ -34,7 +28,9 @@ services:
     restart: always
 
   airflow-init:
-    image: apache/airflow:2.10.3-python3.11
+    build:
+      context: .
+      dockerfile: Dockerfile.airflow
     depends_on:
       - postgres
     environment:
@@ -60,7 +56,9 @@ services:
         echo "Init complete"
 
   airflow-webserver:
-    image: apache/airflow:2.10.3-python3.11
+    build:
+      context: .
+      dockerfile: Dockerfile.airflow
     depends_on:
       - postgres
       - airflow-init
@@ -69,7 +67,6 @@ services:
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
       AIRFLOW__CORE__FERNET_KEY: ''
       AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
-      _PIP_ADDITIONAL_REQUIREMENTS: clickhouse-connect
     volumes:
       - ./dags:/opt/airflow/dags
       - ./logs:/opt/airflow/logs
@@ -80,7 +77,9 @@ services:
     restart: always
 
   airflow-scheduler:
-    image: apache/airflow:2.10.3-python3.11
+    build:
+      context: .
+      dockerfile: Dockerfile.airflow
     depends_on:
       - postgres
       - airflow-init
@@ -89,7 +88,6 @@ services:
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
       AIRFLOW__CORE__FERNET_KEY: ''
       AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
-      _PIP_ADDITIONAL_REQUIREMENTS: clickhouse-connect
     volumes:
       - ./dags:/opt/airflow/dags
       - ./logs:/opt/airflow/logs

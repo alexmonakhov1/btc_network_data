@@ -4,8 +4,9 @@ from airflow.operators.python import PythonOperator
 import clickhouse_connect
 import requests
 from urllib.parse import urlparse
+from airflow.providers.telegram.operators.telegram import TelegramOperator
+from airflow.exceptions import AirflowException
 
-# https://api.coingecko.com/api/v3/coins/bitcoin/history?date=02-01-2025
 
 CH_CLIENT = clickhouse_connect.get_client(
     host='clickhouse',
@@ -17,7 +18,6 @@ CH_CLIENT = clickhouse_connect.get_client(
 
 
 def extract_load_btc_price(client, url, date, **kwargs):
-    print("url: ", f"{url}{date}")
     response = requests.get(f"{url}{date}")
     if response.status_code == 200:
         btc_price_usd = int(round(response.json()["market_data"]["current_price"]["usd"]))
@@ -31,12 +31,42 @@ def extract_load_btc_price(client, url, date, **kwargs):
 
         client.query(f"INSERT INTO src_btc_price VALUES ('{source_name}', '{date_clickhouse}', 'USD', '{btc_price_usd}')")
     else:
-        # TODO: Alert to tg
-        print("Failed to get btc_price_usd. Status code:", response.status_code)
+        raise AirflowException(f"Failed to get btc_price_usd. Status code: {response.status_code}")
 
+
+def on_failure_callback(context):
+    dag_id = context.get("dag").dag_id
+    task_id = context.get("task_instance").task_id
+    execution_date = context.get("execution_date")
+    run_id = context.get("run_id")
+    exception = context.get("exception")
+
+    message = f"""
+Airflow task failed 😱
+
+DAG: {dag_id}
+Task: {task_id}
+Execution date: {execution_date}
+Run ID: {run_id}
+Exception:{exception}
+    """.strip()
+
+    send_message = TelegramOperator(
+        task_id='send_message_telegram',
+        telegram_conn_id='telegram_id',
+        chat_id='-1003370928329',
+        text=message,
+        dag=dag)
+    return send_message.execute(context=context)
+
+
+default_args = {
+    'on_failure_callback': on_failure_callback
+}
 
 with DAG(
     'btc_price',
+    default_args=default_args,
     schedule_interval='@daily',
     start_date=datetime(2025, 1, 1),
     end_date=datetime(2025, 1, 10),

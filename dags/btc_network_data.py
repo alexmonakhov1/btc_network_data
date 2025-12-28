@@ -23,7 +23,7 @@ charts = ['hash-rate', 'miners-revenue', 'transaction-fees-usd', 'transaction-fe
 task_list = list()
 
 
-
+# TODO: Ещё раз проверить, правильные ли данные на дату. Смущает data_interval_start.int_timestamp
 def extract_load(client, url, chart, start_unix_timestamp, timespan, rolling_average, **kwargs):
     response = requests.get(
         f"{url}{chart}?start={start_unix_timestamp}&timespan={timespan}days&rollingAverage={rolling_average}days&format=json")
@@ -31,7 +31,6 @@ def extract_load(client, url, chart, start_unix_timestamp, timespan, rolling_ave
     if response.status_code == 200:
         date = datetime.fromtimestamp(response.json()["values"][0]["x"]).date()
         value = round(response.json()["values"][0]["y"])
-        date_clickhouse = kwargs['ds']
 
         client.query(
             f"CREATE TABLE IF NOT EXISTS src_{chart.replace('-', '_')} (date String, {chart.replace('-', '_')} String) ENGINE = MergeTree PARTITION BY date ORDER BY (date)")

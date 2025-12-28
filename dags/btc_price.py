@@ -15,7 +15,7 @@ CH_CLIENT = clickhouse_connect.get_client(
     database='btc_network_data'
 )
 
-# TODO: переписать код на идемпотентный
+
 def extract_load_btc_price(client, url, date, **kwargs):
     print("url: ", f"{url}{date}")
     response = requests.get(f"{url}{date}")
@@ -23,8 +23,12 @@ def extract_load_btc_price(client, url, date, **kwargs):
         btc_price_usd = int(round(response.json()["market_data"]["current_price"]["usd"]))
         source_name = urlparse(url).hostname
         date_clickhouse = kwargs['ds']
+
         client.query(
             f'CREATE TABLE IF NOT EXISTS src_btc_price (source_name String, date Date, currency_name String, current_price Int64) ENGINE = MergeTree PARTITION BY date ORDER BY (source_name, currency_name, date)')
+
+        client.query(f"DELETE FROM src_btc_price WHERE date = '{date_clickhouse}'")
+
         client.query(f"INSERT INTO src_btc_price VALUES ('{source_name}', '{date_clickhouse}', 'USD', '{btc_price_usd}')")
     else:
         # TODO: Alert to tg
